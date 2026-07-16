@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>
+   Neon Piano Tiles - V5 (Pause sur erreur)
+  </title>
+  <style>
+   :root {
+            --lane-color: #1a1a1a;
+            --lane-border: #333;
+            --tile-color: #00d2ff;
+            --tile-gradient: linear-gradient(180deg, #00d2ff 0%, #0078ff 100%);
+            --bg-color: #050505;
+            --text-color: #fff;
+            --danger-color: #ff004c;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            color: var(--text-color);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 420px;
+            height: 650px;
+            box-shadow: 0 0 50px rgba(0, 210, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            border: 2px solid #333;
+        }
+
+        #damage-flash {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 0, 76, 0.4);
+            z-index: 80;
+            pointer-events: none;
+            display: none;
+        }
+
+        .header-ui {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 80px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            padding: 10px 20px;
+            pointer-events: none;
+        }
+
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #lives-display {
+            color: var(--danger-color);
+            font-size: 24px;
+            letter-spacing: 2px;
+        }
+
+        #score-display { font-size: 32px; font-weight: 800; text-shadow: 0 0 10px #00d2ff; }
+        #level-display { font-size: 14px; color: #aaa; text-transform: uppercase; margin-top: 5px; }
+
+        .lanes { display: flex; width: 100%; height: 100%; }
+
+        .lane {
+            position: relative;
+            width: 25%;
+            height: 100%;
+            border-right: 1px solid var(--lane-border);
+            background: var(--lane-color);
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .lane:last-child { border-right: none; }
+
+        .lane.active-press {
+            background: linear-gradient(to top, rgba(0, 210, 255, 0.2), transparent);
+        }
+
+        .key-hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+            color: rgba(255,255,255,0.15);
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #judgment-line {
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+            opacity: 0.6;
+            z-index: 40;
+            pointer-events: none;
+        }
+
+        .tile {
+            position: absolute;
+            width: 100%;
+            height: 140px;
+            left: 0;
+            background: var(--tile-gradient);
+            border-radius: 4px;
+            transform: scaleX(0.9); 
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+            z-index: 10;
+        }
+
+        .tile.hit {
+            transform: scale(1.1);
+            opacity: 0;
+            transition: all 0.15s ease-out;
+            background: #fff;
+            box-shadow: 0 0 30px #fff;
+        }
+
+        .tile.missed {
+            background: var(--danger-color) !important;
+            box-shadow: 0 0 20px var(--danger-color);
+            z-index: 11;
+        }
+
+        #overlay, #pause-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+
+        #pause-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+        }
+
+        h1 { margin: 0; font-size: 42px; color: #fff; text-transform: uppercase; }
+        h1 span { color: #00d2ff; }
+        
+        .btn {
+            margin-top: 25px;
+            padding: 15px 50px;
+            font-size: 22px;
+            background: transparent;
+            color: #00d2ff;
+            border: 2px solid #00d2ff;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 25px #00d2ff; }
+
+        .settings-area {
+            margin-top: 40px;
+            background: #111;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444; transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #00d2ff; }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        #level-up-notif {
+            position: absolute;
+            top: 45%; width: 100%; text-align: center;
+            font-size: 45px; font-weight: 900; color: #ffcc00;
+            text-shadow: 0 0 20px #ffcc00; opacity: 0; transform: scale(0.5);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none; z-index: 60;
+        }
+        #level-up-notif.show { opacity: 1; transform: scale(1.1); }
+
+    .credit { position: fixed; bottom: 10px; right: 10px; font-size: 12px; color: #666; z-index: 1000; }
+  </style>
+ </head>
+ <body>
+  <div id="game-wrapper">
+   <div id="damage-flash">
+   </div>
+   <div class="header-ui">
+    <div class="top-row">
+     <div id="lives-display">
+      ❤️❤️❤️
+     </div>
+     <div id="score-display">
+      0
+     </div>
+    </div>
+    <div id="level-display">
+     Niveau 1 : Débutant
+    </div>
+   </div>
+   <div id="level-up-notif">
+    NIVEAU SUPÉRIEUR !
+   </div>
+   <div class="lanes" id="lanes-container">
+    <div class="lane" data-index="0">
+     <div class="key-hint">
+      1
+     </div>
+    </div>
+    <div class="lane" data-index="1">
+     <div class="key-hint">
+      2
+     </div>
+    </div>
+    <div class="lane" data-index="2">
+     <div class="key-hint">
+      3
+     </div>
+    </div>
+    <div class="lane" data-index="3">
+     <div class="key-hint">
+      4
+     </div>
+    </div>
+   </div>
+   <div id="judgment-line">
+   </div>
+   <div id="pause-overlay">
+    <h2 style="color: #ff004c; font-size: 32px;">
+     OUPS !
+    </h2>
+    <p style="color: #ccc;">
+     Concentration... Il vous reste des vies.
+    </p>
+    <button class="btn" onclick="resumeGame()">
+     CONTINUER
+    </button>
+    <p style="margin-top: 15px; font-size: 12px; color: #666;">
+     Appuyez sur une touche pour reprendre
+    </p>
+   </div>
+   <div id="overlay">
+    <h1>
+     Neon
+     <span>
+      Tiles
+     </span>
+    </h1>
+    <p id="msg-text" style="color:#888; margin-bottom: 20px; font-size:16px;">
+     V5.0 - Safety Pause Edition
+    </p>
+    <button class="btn" onclick="startGame()">
+     JOUER
+    </button>
+    <div class="settings-area">
+     <span style="font-size:16px; color:#ccc">
+      Son
+     </span>
+     <label class="toggle-switch">
+      <input checked="" id="sound-toggle" type="checkbox"/>
+      <span class="slider">
+      </span>
+     </label>
+    </div>
+   </div>
+  </div>
+  <script>
+   const LEVELS = [
+            { score: 0, speed: 3.5, name: "Débutant" },
+            { score: 10, speed: 4, name: "Apprenti" },
+            { score: 25, speed: 4.5, name: "Facile" },
+            { score: 50, speed: 5.2, name: "Amateur" },
+            { score: 80, speed: 6, name: "Moyen" },
+            { score: 120, speed: 7, name: "Confirmé" },
+            { score: 170, speed: 8, name: "Avancé" },
+            { score: 230, speed: 9, name: "Pro" },
+            { score: 300, speed: 10, name: "Expert" },
+            { score: 380, speed: 11.5, name: "Elite" },
+            { score: 480, speed: 13, name: "Maître" },
+            { score: 600, speed: 15, name: "Grand Maître" },
+            { score: 750, speed: 17, name: "Légende" },
+            { score: 950, speed: 19, name: "Demi-Dieu" },
+            { score: 1200, speed: 22, name: "DIVIN" }
+        ];
+
+        const scoreEl = document.getElementById('score-display');
+        const levelEl = document.getElementById('level-display');
+        const livesEl = document.getElementById('lives-display');
+        const overlay = document.getElementById('overlay');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const msgText = document.getElementById('msg-text');
+        const notif = document.getElementById('level-up-notif');
+        const laneElements = document.querySelectorAll('.lane');
+        const soundToggle = document.getElementById('sound-toggle');
+        const damageFlash = document.getElementById('damage-flash');
+
+        let state = {
+            running: false,
+            paused: false,
+            score: 0,
+            lives: 3,
+            currentLevelIndex: 0,
+            tiles: [],
+            spawnTimer: 0,
+            animId: null
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const frequencies = [261.63, 293.66, 329.63, 349.23];
+
+        function playNote(laneIndex) {
+            if (!soundToggle.checked) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequencies[laneIndex], audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function triggerDamage() {
+            if (!state.running || state.paused) return;
+            
+            state.lives--;
+            state.paused = true; // Met en pause la logique de mouvement
+            
+            livesEl.innerText = "❤️".repeat(Math.max(0, state.lives)) + "🖤".repeat(3 - Math.max(0, state.lives));
+            damageFlash.style.display = 'block';
+            
+            if (state.lives <= 0) {
+                gameOver();
+            } else {
+                pauseOverlay.style.display = 'flex';
+            }
+        }
+
+        function resumeGame() {
+            if (!state.paused || state.lives <= 0) return;
+            
+            // Nettoyage des tuiles manquées avant de repartir
+            state.tiles = state.tiles.filter(t => {
+                if (t.el.classList.contains('missed') || t.y > 600) {
+                    if(t.el.parentNode) t.el.remove();
+                    return false;
+                }
+                return true;
+            });
+
+            state.paused = false;
+            damageFlash.style.display = 'none';
+            pauseOverlay.style.display = 'none';
+            gameLoop();
+        }
+
+        function startGame() {
+            state.score = 0; state.lives = 3; state.currentLevelIndex = 0;
+            state.tiles = []; state.spawnTimer = 0;
+            state.running = true; state.paused = false;
+            
+            laneElements.forEach(lane => {
+                lane.querySelectorAll('.tile').forEach(t => t.remove());
+            });
+
+            scoreEl.innerText = "0";
+            livesEl.innerText = "❤️❤️❤️";
+            levelEl.innerText = "Niveau 1 : Débutant";
+            overlay.style.display = 'none';
+            pauseOverlay.style.display = 'none';
+            gameLoop();
+        }
+
+        function spawnTile() {
+            const laneIndex = Math.floor(Math.random() * 4);
+            const div = document.createElement('div');
+            div.className = 'tile';
+            div.style.top = '-150px'; 
+            laneElements[laneIndex].appendChild(div);
+            state.tiles.push({ el: div, y: -150, lane: laneIndex, active: true });
+        }
+
+        function updateLevel() {
+            const nextLevel = LEVELS[state.currentLevelIndex + 1];
+            if (nextLevel && state.score >= nextLevel.score) {
+                state.currentLevelIndex++;
+                notif.innerText = "NIVEAU " + (state.currentLevelIndex + 1);
+                notif.classList.add('show');
+                setTimeout(() => notif.classList.remove('show'), 800);
+                levelEl.innerText = `Niveau ${state.currentLevelIndex + 1} : ${nextLevel.name}`;
+            }
+        }
+
+        function gameLoop() {
+            if (!state.running || state.paused) return;
+
+            const currentSpeed = LEVELS[state.currentLevelIndex].speed;
+            state.spawnTimer += currentSpeed;
+
+            if (state.spawnTimer > 180) { 
+                spawnTile();
+                state.spawnTimer = 0;
+            }
+
+            state.tiles.forEach(tile => {
+                if (tile.active) {
+                    tile.y += currentSpeed;
+                    tile.el.style.top = tile.y + 'px';
+                    if (tile.y > 650) {
+                        tile.active = false;
+                        tile.el.classList.add('missed');
+                        triggerDamage();
+                    }
+                }
+            });
+
+            state.tiles = state.tiles.filter(t => {
+                if (!t.active && (t.y > 650 || t.el.classList.contains('hit'))) {
+                    if (!state.paused) setTimeout(() => { if(t.el.parentNode) t.el.remove(); }, 200);
+                    return false;
+                }
+                return true;
+            });
+
+            state.animId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleInput(laneIndex) {
+            if (!state.running) return;
+            if (state.paused) {
+                resumeGame(); // N'importe quelle touche reprend le jeu si en pause
+                return;
+            }
+
+            laneElements[laneIndex].classList.add('active-press');
+            setTimeout(() => laneElements[laneIndex].classList.remove('active-press'), 100);
+
+            const validTiles = state.tiles.filter(t => t.active && t.lane === laneIndex);
+            validTiles.sort((a, b) => b.y - a.y);
+            const target = validTiles.find(t => t.y > 350 && t.y < 680);
+
+            if (target) {
+                target.active = false;
+                target.el.classList.add('hit');
+                playNote(laneIndex);
+                state.score++;
+                scoreEl.innerText = state.score;
+                updateLevel();
+            } else {
+                triggerDamage();
+            }
+        }
+
+        function gameOver() {
+            state.running = false;
+            state.paused = false;
+            cancelAnimationFrame(state.animId);
+            damageFlash.style.display = 'none';
+            pauseOverlay.style.display = 'none';
+
+            setTimeout(() => {
+                overlay.style.display = 'flex';
+                document.querySelector('h1 span').innerText = "OVER";
+                msgText.innerHTML = `Score Final : <strong style="color:#fff; font-size:24px">${state.score}</strong><br>Niveau atteint : ${LEVELS[state.currentLevelIndex].name}`;
+                document.querySelector('.btn').innerText = "RÉESSAYER";
+            }, 300);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const keyMap = { '1':0, '&':0, '2':1, 'é':1, '3':2, '"':2, '4':3, '\'':3 };
+            if (keyMap[e.key] !== undefined) handleInput(keyMap[e.key]);
+        });
+
+        laneElements.forEach(lane => {
+            lane.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                handleInput(parseInt(lane.dataset.index));
+            });
+            lane.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handleInput(parseInt(lane.dataset.index));
+            }, {passive: false});
+        });
+  </script>
+  <a class="credit">
+   Crédit HTML : Foufy_2.0
+   <a>
+   </a>
+  </a>
+ </body>
+</html>
